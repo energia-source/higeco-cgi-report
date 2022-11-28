@@ -74,10 +74,6 @@ if ! [ -v PROXY_PORT ] ; then
     RESPONSE+=("environment: Specifies the proxy port.")
 fi
 
-if ! [ -v GWCACTION ] ; then
-    RESPONSE+=("environment: Specifies the Higeco GWC actions.")
-fi
-
 if ! [ -v GWCUSER ] ; then
     RESPONSE+=("environment: Specifies the GWC username.")
 fi
