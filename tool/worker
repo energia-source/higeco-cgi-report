@@ -1,0 +1,56 @@
+#!/bin/bash
+
+source $TOOL/argument "$@"
+
+LOGIN='query=[{"act":"getStatus"}]'
+RUNONGWC='query=[{"act":"getServerConf","idReq":"getServerConf","DATI":{}}]'
+
+login() {
+    local response=$($CURL -k -s -X POST --data "${LOGIN}&u=${GWCUSER}&p=${GWCPASS}" --connect-timeout 24 --retry 8 --compressed "http://${PROXY}:${PROXY_PORT}/taz?protocol=${3}&host=${1}&port=${2}" | $JQ -rc .DATI[0].DATI.k)
+    [ "null" != "$response" ] && echo "gwc=${response}"
+    return 0
+}
+
+writefile() {
+    case "${3}" in
+        'getServerConf')
+        local first=$($JQ -rc --arg serial "${1}" '[$serial,.abilServer,.abilTun,.confPort,.confServer,.iTimeout,.kAlive,.periodoRefresh,.port,.pushServer,.rtData,.server,.sincTime,.timeReboot,.vpnSupported] | @csv' <<< "${4}")
+        [[ ! -f "${2}" ]] && echo "Serial,abilServer,abilTun,confPort,confServer,iTimeout,kAlive,periodoRefresh,port,pushServer,rtData,server,sincTime,timeReboot,vpnSupported" > "${2}"
+        echo $first >> "${2}"
+    ;;
+    esac
+    return 0
+}
+
+action() {
+    local date=$(date '+%Y-%m-%d %H:%M:%S')
+    local host=$($JQ -rc .energia_europa_higeco_connectivity_ip <<< "$2")
+    local port=$($JQ -rc .energia_europa_higeco_connectivity_port <<< "$2")
+    local protocol=$($JQ -rc .energia_europa_higeco_connectivity_protocol <<< "$2")
+    local authorization=$(login ${host} ${port} ${protocol})
+    if ! [ ${#authorization} ] ; then
+        return 1
+    fi
+    local response=$($CURL -k -s -X POST --data "${RUNONGWC}" -b "${authorization}" --compressed "http://${PROXY}:${PROXY_PORT}/bunny?protocol=${protocol}&host=${host}&port=${port}")
+    local test=$($JQ -r .DATI <<< "$response")
+    if [ "null" == "$test" ] ; then
+        return 2
+    fi
+    readarray -t MAIN < <($JQ -rc .DATI[] <<< "$response");
+    for type in "${MAIN[@]}"; do
+        local act=$($JQ -rc .act <<< "$type")
+        local outfile="$OUTPUT/${act}.csv"
+        readarray -t LINES < <($JQ -rc .DATI[] <<< "$type");
+        for line in "${LINES[@]}"; do
+            writefile "${1}" "$outfile" "$act" "$line"
+        done
+    done
+    return 0
+}
+
+DEVICE=$($CURL -k -s -X POST -F "device_serial=$SERIAL" -H "x-authorization: $AUTHORIZATION" https://higeco.energia-europa.com/api/alarm/connectivity/read?count=1 | $JQ -r .data[0])
+if [ "null" != "$DEVICE" ] ; then
+    action "$SERIAL" "$DEVICE"
+fi
+
+exit 0

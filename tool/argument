@@ -1,0 +1,36 @@
+#!/bin/bash
+
+while getopts s: options; do
+   case ${options} in
+      s) SERIAL=${OPTARG} ;;
+   esac
+done
+
+declare -a RESPONSE=()
+
+if ! [ -v JQ ] ; then
+  RESPONSE+=("Export: Specifies the JQ.")
+fi
+
+if ! [ -v CURL ] ; then
+  RESPONSE+=("Export: Specifies the CURL.")
+fi
+
+if ! [ -v OUTPUT ] ; then
+  RESPONSE+=("Export: Specifies the OUTPUT.")
+fi
+
+if ! [ -v AUTHORIZATION ] ; then
+  RESPONSE+=("Export: Specifies the AUTHORIZATION.")
+fi
+
+if ! [ -v SERIAL ] ; then
+  RESPONSE+=("-s: Specifies the serial.")
+fi
+
+if [ ${#RESPONSE[@]} -ne 0 ] ; then
+  printf '%s\n' "${RESPONSE[@]}"
+  exit 1;
+fi
+
+unset RESPONSE
